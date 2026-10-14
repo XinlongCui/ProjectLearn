@@ -1,0 +1,48 @@
+mng_network_framework 详细中文注释学习副本
+
+来源：C:\Users\TU\Documents\client2\creator\assets\scripts\modules\logic\mng_network_framework
+目标：C:\Users\TU\Desktop\mng_network_framework
+
+本副本的用途
+22个TypeScript文件均补充了[学习注释]，涵盖文件职责、关键字段、方法输入输出、调用时机、分支原因和当前实现的限制。
+6个Markdown文档保留原文并增加与当前代码对照的阅读批注。原注释/示例中与实现不符的地方明确标注，没有偷偷改运行逻辑。
+原有.meta文件仅逐字节复制，没有生成uuid或修改导入参数。它们用于保留原目录内容，不是学习注释的编辑对象。
+这是源代码阅读副本，仍依赖原工程中的Cocos、Int64、MsgMgr、业务模块等，不能当作桌面独立可运行项目。
+
+推荐阅读顺序
+1. mng_base_frame_data.ts：操作→玩家操作组→完整帧包。
+2. mng_frame_sync_config.ts / mng_frame_sync_types.ts：时间单位、状态、回调、日志约定。
+3. mng_frame_buffer.ts：Map按帧号存取，覆盖与清理，为什么它不是FIFO。
+4. mng_client_frame_sync_manager.ts：数据入口和时间入口分开，先读addClientFrame/addServerFrame/updateLogicFrame。
+5. mng_frame_predictor.ts / mng_frame_corrector.ts：基础位置预测与缓存校正的范围。
+6. mng_base_frame_sync_driver.ts：连续游标、缺口请求、历史批处理；mng_base_frame_sync_protocol.ts：网络契约。
+7. example/：数据扩展、协议与Driver连接、生命周期，留意原示例的已标注缺口。
+8. utils/：精度、随机序列、数学工具；utils/local_file/：四种平台存储策略和测试上传UI。
+
+关于前面讨论的“操作多了是否排队延长”
+sendFrame是Protocol提交操作消息；Manager没有发送接口。
+addClientFrame只是写Map，默认key=原始帧号+delay；同key再次写入会替换clientFrame。
+updateLogicFrame按dt推进计数器，再查询当前key；没有数据也前进，处理后不立即删除。
+普通addServerFrame在调用链中立即交给onServerFrame；玩法是否继续排队、是否按固定步消费，由玩法自己实现。
+serverFrameQueue当前没有入队/出队代码。replay待派发数据存pendingServerFrameDataMap，结束批次才交给业务。
+
+建议手算的例子
+A. delay=5，addClientFrame(100,A)后再addClientFrame(100,B)：key105最终是B，逻辑帧号没变。
+B. 当前逻辑104，正常advance一次到105：读key105并调用onClientFrame，然后发logic更新事件。
+C. 首次收到服务器120、delay5：直接对齐本地115，不会把0到114的玩法全执行一遍。
+D. 已连续收到100、再来103：Driver请求从101恢复并丢弃当前103，不会在通用Driver缓存它等101。
+E. replay灌100/101/102：实现批量接口会拿到排序数组；没实现时只拿到102。
+
+关键实现事实
+setAddServerFrame(true)允许接收，false禁止，部分原文示例写反。
+rate与interval需同时一致配置；逻辑dt是秒，networkLatency是毫秒估计且不是RTT。
+Buffer.serverFrame每key只有一个玩家组槽位，完整多人包通过原frameData交给业务。
+预测只外推基础坐标；校正按__rid+seqId匹配，新增玩法字段不会自动处理。
+stop清监听但保留dataHandler，destroy再清handler；当前stop未显式清追帧欠账。
+pause期间新数据在Manager入口被忽略，并非自动排队。
+例子是教学骨架，部分网络代码被注释；二次解析、开关布尔值和显示单位缺口均已旁注。
+
+如何验证这份副本
+交付前自动检查：22个TS文件去掉新增学习注释后与源文件逐字节一致；比较TypeScript语法树及去注释编译输出；.meta与源文件哈希一致。
+源文件不被修改。验证说明针对“只增加注释”，不代表修复了原有实现或完成了Cocos运行回归。
+查看同目录“校验结果.txt”可见本次实际校验结果。
